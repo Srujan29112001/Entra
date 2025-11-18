@@ -7,6 +7,11 @@ from app.tools.strategy_frameworks import (
     analyze_market_size,
     recommend_pricing_strategy,
 )
+from app.tools.external_apis import (
+    fetch_market_news,
+    fetch_market_size,
+    fetch_industry_trends,
+)
 
 
 class MarketStrategyAgent(BaseAgent):
@@ -95,17 +100,27 @@ Be strategic, practical, and data-informed. Focus on actions the entrepreneur ca
         )
 
     async def _run_strategy_analysis(self, company_data: dict, question: str) -> dict:
-        """Run strategic analysis."""
+        """Run strategic analysis with external data."""
         results = {}
 
         # SWOT Analysis
         results["swot"] = generate_swot_analysis(company_data)
 
-        # Market sizing
+        # Market sizing (use external API)
         industry = company_data.get("industry", "")
         geography = company_data.get("country", "")
-        if industry and geography:
-            results["market_size"] = analyze_market_size(industry, geography)
+        if industry:
+            # Fetch real market data
+            external_market_data = await fetch_market_size(industry)
+            results["market_size"] = external_market_data
+
+            # Also get industry trends
+            industry_trends = await fetch_industry_trends(industry)
+            results["industry_trends"] = industry_trends
+
+            # Get relevant news
+            news = await fetch_market_news(industry, limit=5)
+            results["recent_news"] = news
 
         # Pricing recommendations
         product_type = company_data.get("product_type", "saas")

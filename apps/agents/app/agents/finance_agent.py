@@ -8,6 +8,7 @@ from app.tools.financial_calculators import (
     calculate_unit_economics,
     project_revenue,
 )
+from app.tools.external_apis import fetch_stock_quote, FinancialDataAPI
 import uuid
 
 
