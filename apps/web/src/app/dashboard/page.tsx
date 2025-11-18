@@ -28,8 +28,11 @@ import {
   Calendar,
   MessageSquare,
   LogOut,
+  Download,
+  BarChart3,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { exportDashboardToPDF } from "@/lib/export-pdf";
 
 interface DashboardData {
   company: any;
@@ -159,9 +162,17 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => router.push("/dashboard/scenarios")}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Scenarios
+            </Button>
             <Button variant="outline" onClick={() => router.push("/chat")}>
               <MessageSquare className="h-4 w-4 mr-2" />
               Ask AI Advisors
+            </Button>
+            <Button variant="outline" onClick={() => exportDashboardToPDF({ company: data.company, financials: data.financials, metrics: data.metrics })}>
+              <Download className="h-4 w-4 mr-2" />
+              Export PDF
             </Button>
             <Button variant="ghost" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
