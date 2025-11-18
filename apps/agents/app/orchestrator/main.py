@@ -233,10 +233,84 @@ class OrchestratorService:
         # Run through the graph
         final_state = await self.graph.ainvoke(initial_state)
 
+        # Extract chart data from agent responses
+        chart_data = self._extract_chart_data(final_state["agent_responses"])
+
         return OrchestratorResponse(
             task_id=task_id,
             final_answer=final_state["final_answer"],
             agent_responses=final_state["agent_responses"],
-            chart_data=None,  # TODO: Extract chart data from responses
+            chart_data=chart_data,
             metadata=final_state["metadata"],
         )
+
+    def _extract_chart_data(self, responses: list[AgentResponse]) -> dict[str, Any] | None:
+        """
+        Extract chart-worthy data from agent responses.
+
+        Looks for numerical data, projections, comparisons that can be visualized.
+
+        Args:
+            responses: List of agent responses
+
+        Returns:
+            Dictionary of chart data or None
+        """
+        chart_data = {
+            "financial_metrics": [],
+            "projections": [],
+            "comparisons": [],
+            "time_series": [],
+        }
+
+        for response in responses:
+            # Extract data from the response's data field
+            if response.data:
+                agent_data = response.data
+
+                # Finance agent data
+                if response.agent_type == "finance":
+                    if "runway" in agent_data:
+                        chart_data["financial_metrics"].append({
+                            "name": "Runway (months)",
+                            "value": agent_data["runway"],
+                            "type": "metric"
+                        })
+                    if "burn_rate" in agent_data:
+                        chart_data["financial_metrics"].append({
+                            "name": "Monthly Burn Rate",
+                            "value": agent_data["burn_rate"],
+                            "type": "metric"
+                        })
+                    if "projections" in agent_data:
+                        chart_data["projections"] = agent_data["projections"]
+
+                # Tax agent data
+                elif response.agent_type == "tax":
+                    if "tax_breakdown" in agent_data:
+                        chart_data["comparisons"].append({
+                            "category": "Tax Structure",
+                            "data": agent_data["tax_breakdown"],
+                        })
+
+                # Market agent data
+                elif response.agent_type == "market":
+                    if "market_size" in agent_data:
+                        chart_data["comparisons"].append({
+                            "category": "Market Size",
+                            "data": agent_data["market_size"],
+                        })
+                    if "growth_projections" in agent_data:
+                        chart_data["time_series"].append({
+                            "series": "Market Growth",
+                            "data": agent_data["growth_projections"],
+                        })
+
+        # Return None if no chart data was extracted
+        if (not chart_data["financial_metrics"] and
+            not chart_data["projections"] and
+            not chart_data["comparisons"] and
+            not chart_data["time_series"]):
+            return None
+
+        return chart_data

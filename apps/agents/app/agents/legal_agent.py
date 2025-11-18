@@ -95,40 +95,93 @@ Be thorough, clear, and risk-aware. Flag anything unusual or concerning."""
         """
         Analyze a legal document (contract, term sheet, etc.).
 
-        This would integrate with document processing pipeline:
+        This integrates with document processing pipeline:
         1. Extract text from PDF
         2. Identify clause types
         3. Extract key terms
         4. Flag unusual provisions
         """
-        # TODO: Implement actual document processing
-        # For now, return structure
-        return {
-            "document_id": document_id,
-            "document_type": "term_sheet",
-            "key_clauses": [
-                {
-                    "type": "valuation",
-                    "content": "Pre-money valuation: $10M",
-                    "standard": True,
-                },
-                {
-                    "type": "liquidation_preference",
-                    "content": "1x non-participating",
-                    "standard": True,
-                },
-                {
-                    "type": "board_composition",
-                    "content": "2 founders, 2 investors, 1 independent",
-                    "standard": True,
-                },
-            ],
-            "red_flags": [],
-            "questions_for_lawyer": [
-                "Confirm vesting schedule aligns with employment agreement",
-                "Review anti-dilution provisions in detail",
-            ],
-        }
+        try:
+            from app.tools.vision_tools import VisionAnalyzer
+            from supabase.client import create_client
+            from app.config import settings
+            import tempfile
+            import os
+
+            # Get document from database
+            supabase = create_client(
+                settings.supabase_url,
+                settings.supabase_service_role_key,
+            )
+
+            result = supabase.table("documents").select("*").eq("id", document_id).single().execute()
+
+            if not result.data:
+                raise ValueError(f"Document {document_id} not found")
+
+            document = result.data
+            file_path = document.get("file_path")
+
+            if not file_path:
+                raise ValueError("Document has no file path")
+
+            # If it's a Supabase storage path, download it
+            if file_path.startswith("documents/"):
+                storage_response = supabase.storage.from_("documents").download(file_path)
+
+                # Save to temp file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                    tmp_file.write(storage_response)
+                    temp_path = tmp_file.name
+
+                file_path = temp_path
+
+            # Analyze with vision tools
+            analyzer = VisionAnalyzer()
+            analysis = await analyzer.analyze_pdf_contract(file_path, analysis_type="comprehensive")
+
+            # Clean up temp file if created
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                os.unlink(temp_path)
+
+            return {
+                "document_id": document_id,
+                "document_type": analysis.get("document_type", "contract"),
+                "key_clauses": analysis.get("key_clauses", []),
+                "red_flags": self._extract_red_flags(analysis),
+                "questions_for_lawyer": analysis.get("recommendations", []),
+                "risk_score": analysis.get("risk_score", 0),
+            }
+
+        except Exception as e:
+            print(f"Error analyzing document: {e}")
+            # Return structured fallback
+            return {
+                "document_id": document_id,
+                "document_type": "unknown",
+                "key_clauses": [],
+                "red_flags": [],
+                "questions_for_lawyer": ["Unable to analyze document - please upload again or consult a lawyer"],
+                "error": str(e),
+            }
+
+    def _extract_red_flags(self, analysis: dict) -> list[str]:
+        """Extract red flags from vision analysis."""
+        red_flags = []
+
+        # Check analysis text for warning keywords
+        analysis_text = str(analysis.get("analysis", "")).lower()
+
+        warning_keywords = [
+            "unusual", "non-standard", "concerning", "risk",
+            "unfavorable", "aggressive", "problematic"
+        ]
+
+        for keyword in warning_keywords:
+            if keyword in analysis_text:
+                red_flags.append(f"Contains {keyword} terms or clauses")
+
+        return list(set(red_flags))  # Remove duplicates
 
     def _identify_warnings(self, analysis: dict) -> list[str]:
         """Identify legal risks and warnings."""
