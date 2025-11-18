@@ -18,20 +18,20 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = ["http://localhost:3000"]
 
     # Supabase
-    supabase_url: str
-    supabase_key: str
-    supabase_service_role_key: str
+    supabase_url: str = "https://placeholder.supabase.co"
+    supabase_key: str = "placeholder-key"
+    supabase_service_role_key: str = "placeholder-service-key"
 
     # Database
-    database_url: str
+    database_url: str = "postgresql://postgres:postgres@localhost:5432/entra"
 
     # OpenAI
-    openai_api_key: str
+    openai_api_key: str = "sk-placeholder"
     openai_model: str = "gpt-4-turbo-preview"
     openai_embedding_model: str = "text-embedding-3-small"
 
     # Anthropic
-    anthropic_api_key: str
+    anthropic_api_key: str = "sk-ant-placeholder"
     anthropic_model: str = "claude-3-5-sonnet-20240620"
 
     # Redis
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     helicone_api_key: str | None = None
 
     # Security
-    secret_key: str
+    secret_key: str = "dev-secret-key-change-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
