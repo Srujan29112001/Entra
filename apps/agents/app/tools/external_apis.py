@@ -133,64 +133,42 @@ class FinancialDataAPI:
             "timestamp": datetime.now().isoformat(),
         }
 
-    async def get_economic_indicators(self, indicator: str = "GDP") -> Dict[str, Any]:
+    async def get_economic_indicators(
+        self, indicator: str = "GDP", country: str = "US"
+    ) -> Dict[str, Any]:
         """
-        Get economic indicators (GDP, unemployment, CPI, etc.).
+        Get economic indicators using real FRED/World Bank APIs.
 
         Args:
             indicator: Indicator type (GDP, UNEMPLOYMENT, CPI, INFLATION)
+            country: Country code (US, IN, UK, etc.)
 
         Returns:
             Dict with indicator value and metadata
         """
-        # Alpha Vantage has limited economic data on free tier
-        # In production, use FRED API or World Bank API
-        indicators_map = {
-            "GDP": ("REAL_GDP", "quarterly"),
-            "UNEMPLOYMENT": ("UNEMPLOYMENT", "monthly"),
-            "CPI": ("CPI", "monthly"),
-            "INFLATION": ("INFLATION", "monthly"),
-        }
+        from app.tools.real_data_apis import UnifiedEconomicDataAPI
 
-        if indicator not in indicators_map:
-            return {"error": f"Unknown indicator: {indicator}"}
-
-        function, interval = indicators_map[indicator]
+        unified_api = UnifiedEconomicDataAPI()
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    self.base_url,
-                    params={
-                        "function": function,
-                        "interval": interval,
-                        "apikey": self.alpha_vantage_key,
-                    },
-                    timeout=10.0,
-                )
-                data = response.json()
-                # Parse response (structure varies by indicator)
-                return data
+            indicator_lower = indicator.lower()
+            if indicator_lower in ["gdp", "real_gdp"]:
+                return await unified_api.get_gdp(country)
+            elif indicator_lower in ["unemployment", "unrate"]:
+                return await unified_api.get_unemployment(country)
+            elif indicator_lower in ["inflation", "cpi"]:
+                return await unified_api.get_inflation(country)
+            elif indicator_lower in ["interest_rate", "fed_funds"]:
+                return await unified_api.get_interest_rate(country)
+            else:
+                raise ValueError(f"Unknown indicator: {indicator}")
         except Exception as e:
             print(f"Error fetching economic indicators: {e}")
-            return self._mock_economic_indicator(indicator)
-
-    def _mock_economic_indicator(self, indicator: str) -> Dict[str, Any]:
-        """Mock economic data."""
-        import random
-        values = {
-            "GDP": {"value": 25.5, "unit": "trillion USD", "growth": 2.4},
-            "UNEMPLOYMENT": {"value": 3.7, "unit": "percent"},
-            "CPI": {"value": 304.5, "unit": "index", "change": 3.2},
-            "INFLATION": {"value": 3.2, "unit": "percent"},
-        }
-
-        base = values.get(indicator, {"value": 100.0, "unit": "index"})
-        return {
-            "indicator": indicator,
-            **base,
-            "timestamp": datetime.now().strftime("%Y-%m-%d"),
-        }
+            # Re-raise instead of falling back to mock
+            raise RuntimeError(
+                f"Failed to fetch {indicator} for {country}. "
+                f"Ensure API keys are configured. Error: {e}"
+            )
 
 
 class NewsAPI:
