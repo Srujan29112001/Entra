@@ -16,14 +16,29 @@ async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
     print(f"Starting {settings.app_name} v{settings.app_version}")
+
+    # Initialize Sentry if configured
     if settings.sentry_dsn:
         sentry_sdk.init(
             dsn=settings.sentry_dsn,
             environment=settings.environment,
             traces_sample_rate=1.0 if settings.debug else 0.1,
         )
+
+    # Initialize and start MCP servers
+    print("Initializing MCP (Model Context Protocol) servers...")
+    from app.mcp.servers import initialize_all_servers
+    from app.mcp.registry import MCPRegistry
+
+    servers = initialize_all_servers()
+    await MCPRegistry.start_all_servers()
+    print(f"✓ Started {len(servers)} MCP servers")
+
     yield
+
     # Shutdown
+    print("Shutting down MCP servers...")
+    await MCPRegistry.stop_all_servers()
     print("Shutting down...")
 
 
