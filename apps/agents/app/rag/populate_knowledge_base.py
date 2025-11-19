@@ -91,13 +91,90 @@ async def ingest_source(
             # Scrape and ingest HTML
             content = await scrape_html(source.url)
             if content:
-                # For HTML, we'd need to convert to text chunks
-                # For now, just mark as processed
-                print(f"   ✓ Scraped content ({len(content)} chars)")
-                # TODO: Implement HTML chunking and ingestion
+                # Parse HTML and extract text
+                from bs4 import BeautifulSoup
+
+                soup = BeautifulSoup(content, "html.parser")
+
+                # Remove script and style elements
+                for element in soup(["script", "style", "nav", "footer", "header"]):
+                    element.decompose()
+
+                # Extract text
+                text = soup.get_text(separator="\n", strip=True)
+
+                # Clean up whitespace
+                lines = (line.strip() for line in text.splitlines())
+                text = "\n".join(line for line in lines if line)
+
+                print(f"   ✓ Extracted text ({len(text)} chars from HTML)")
+
+                # Chunk and ingest
+                chunks = _chunk_text(text, chunk_size=1000, overlap=100)
+                print(f"   ✓ Created {len(chunks)} chunks from HTML")
+
+                # Store each chunk in vector DB
+                from app.rag.ingestion import DocumentIngestionPipeline
+
+                pipeline_instance = DocumentIngestionPipeline()
+                for i, chunk in enumerate(chunks):
+                    await pipeline_instance._store_chunk(
+                        chunk_text=chunk,
+                        company_id=company_id,
+                        metadata={
+                            "source": source.url,
+                            "title": source.title,
+                            "category": source.category,
+                            "jurisdiction": source.jurisdiction,
+                            "priority": source.priority,
+                            "doc_type": "html",
+                            "chunk_index": i,
+                        },
+                    )
+
+                print(f"   ✓ Ingested {len(chunks)} chunks to vector DB")
                 return True
 
         return False
+
+
+def _chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[str]:
+    """
+    Chunk text into overlapping segments.
+
+    Args:
+        text: Text to chunk
+        chunk_size: Target size of each chunk (in characters)
+        overlap: Number of overlapping characters between chunks
+
+    Returns:
+        List of text chunks
+    """
+    chunks = []
+    start = 0
+
+    while start < len(text):
+        end = start + chunk_size
+
+        # If not at the end, try to break at a sentence or paragraph
+        if end < len(text):
+            # Look for paragraph break
+            next_para = text.find("\n\n", end)
+            next_sentence = text.find(". ", end)
+
+            if next_para != -1 and next_para < end + 200:
+                end = next_para
+            elif next_sentence != -1 and next_sentence < end + 200:
+                end = next_sentence + 1
+
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+
+        # Move start forward, accounting for overlap
+        start = end - overlap if end < len(text) else end
+
+    return chunks
 
     except Exception as e:
         print(f"   ✗ Error: {e}")
