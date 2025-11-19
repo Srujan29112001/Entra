@@ -85,17 +85,19 @@ class OrchestratorService:
         Analyze this question and determine which specialist agents should handle it.
 
         Available agents:
-        - finance: Financial planning, runway, funding strategy
-        - tax: Tax optimization, policy compliance
-        - market: Market strategy, distribution, GTM
-        - legal: Contract analysis, compliance
-        - wealth: Personal wealth, salary optimization
+        - finance: Financial planning, runway, cash flow, funding strategy
+        - tax: Tax optimization, policy compliance, salary vs dividend
+        - market: Market strategy, distribution, GTM, competitive analysis
+        - legal: Contract analysis, compliance, risk assessment
+        - wealth: Personal wealth, salary optimization, ESOP, portfolio
+        - investor: Fundraising, pitch preparation, investor relations, valuation
+        - operations: Pricing, team planning, hiring, resource allocation
 
         Question: {state['question']}
         Context: {state.get('context', {{}})}
 
         Respond with:
-        1. Task type (finance/tax/market/legal/wealth/composite)
+        1. Task type (finance/tax/market/legal/wealth/investor/operations/composite)
         2. List of agents needed
         3. Complexity (simple/medium/complex)
 
@@ -126,6 +128,10 @@ class OrchestratorService:
         from app.agents.finance_agent import FinanceAgent
         from app.agents.tax_agent import TaxPolicyAgent
         from app.agents.market_agent import MarketStrategyAgent
+        from app.agents.legal_agent import LegalComplianceAgent
+        from app.agents.wealth_agent import PersonalWealthAgent
+        from app.agents.investor_agent import InvestorRelationsAgent
+        from app.agents.operations_agent import OperationsAgent
 
         task_id = str(uuid.uuid4())
         responses = []
@@ -141,17 +147,24 @@ class OrchestratorService:
                 company_id=state["company_id"],
             )
 
-            # Execute agent
+            # Execute agent based on type
+            agent = None
             if agent_type == "finance":
                 agent = FinanceAgent()
-                response = await agent.process(task)
-                responses.append(response)
             elif agent_type == "tax":
                 agent = TaxPolicyAgent()
-                response = await agent.process(task)
-                responses.append(response)
             elif agent_type == "market":
                 agent = MarketStrategyAgent()
+            elif agent_type == "legal":
+                agent = LegalComplianceAgent()
+            elif agent_type == "wealth":
+                agent = PersonalWealthAgent()
+            elif agent_type == "investor":
+                agent = InvestorRelationsAgent()
+            elif agent_type == "operations":
+                agent = OperationsAgent()
+
+            if agent:
                 response = await agent.process(task)
                 responses.append(response)
 
