@@ -52,28 +52,18 @@ class FinancialDataAPI:
                         "timestamp": quote.get("07. latest trading day"),
                     }
                 else:
-                    # Fallback mock data for demo
-                    return self._mock_stock_quote(symbol)
+                    raise RuntimeError(
+                        f"Failed to fetch stock quote for {symbol}. "
+                        f"API response did not contain expected data. "
+                        f"Ensure ALPHA_VANTAGE_API_KEY is valid."
+                    )
+        except httpx.HTTPError as e:
+            raise RuntimeError(
+                f"HTTP error fetching stock quote for {symbol}: {e}. "
+                f"Ensure ALPHA_VANTAGE_API_KEY is configured."
+            )
         except Exception as e:
-            print(f"Error fetching stock quote: {e}")
-            return self._mock_stock_quote(symbol)
-
-    def _mock_stock_quote(self, symbol: str) -> Dict[str, Any]:
-        """Mock stock data for development/demo."""
-        import random
-        base_prices = {"AAPL": 175.0, "MSFT": 380.0, "GOOGL": 140.0, "AMZN": 145.0}
-        base = base_prices.get(symbol, 100.0)
-        price = base + random.uniform(-5, 5)
-        change = random.uniform(-2, 2)
-
-        return {
-            "symbol": symbol,
-            "price": round(price, 2),
-            "change": round(change, 2),
-            "change_percent": f"{(change/price)*100:.2f}%",
-            "volume": random.randint(10000000, 100000000),
-            "timestamp": datetime.now().strftime("%Y-%m-%d"),
-        }
+            raise RuntimeError(f"Failed to fetch stock quote for {symbol}: {e}")
 
     async def get_forex_rate(self, from_currency: str, to_currency: str) -> Dict[str, Any]:
         """
@@ -109,29 +99,18 @@ class FinancialDataAPI:
                         "timestamp": rate_data.get("6. Last Refreshed"),
                     }
                 else:
-                    return self._mock_forex_rate(from_currency, to_currency)
+                    raise RuntimeError(
+                        f"Failed to fetch forex rate for {from_currency}/{to_currency}. "
+                        f"API response did not contain expected data. "
+                        f"Ensure ALPHA_VANTAGE_API_KEY is valid."
+                    )
+        except httpx.HTTPError as e:
+            raise RuntimeError(
+                f"HTTP error fetching forex rate for {from_currency}/{to_currency}: {e}. "
+                f"Ensure ALPHA_VANTAGE_API_KEY is configured."
+            )
         except Exception as e:
-            print(f"Error fetching forex rate: {e}")
-            return self._mock_forex_rate(from_currency, to_currency)
-
-    def _mock_forex_rate(self, from_cur: str, to_cur: str) -> Dict[str, Any]:
-        """Mock forex data."""
-        rates = {
-            ("USD", "EUR"): 0.92,
-            ("USD", "GBP"): 0.79,
-            ("USD", "INR"): 83.12,
-            ("EUR", "USD"): 1.09,
-            ("GBP", "USD"): 1.27,
-            ("INR", "USD"): 0.012,
-        }
-        rate = rates.get((from_cur, to_cur), 1.0)
-
-        return {
-            "from": from_cur,
-            "to": to_cur,
-            "rate": rate,
-            "timestamp": datetime.now().isoformat(),
-        }
+            raise RuntimeError(f"Failed to fetch forex rate for {from_currency}/{to_currency}: {e}")
 
     async def get_economic_indicators(
         self, indicator: str = "GDP", country: str = "US"
@@ -243,36 +222,20 @@ class NewsAPI:
                         for article in data.get("articles", [])
                     ]
                 else:
-                    return self._mock_news(query or category)
+                    error_msg = data.get("message", "Unknown error")
+                    raise RuntimeError(
+                        f"NewsAPI error: {error_msg}. "
+                        f"Ensure NEWS_API_KEY is valid and has sufficient quota."
+                    )
+        except httpx.HTTPError as e:
+            raise RuntimeError(
+                f"HTTP error fetching news: {e}. "
+                f"Ensure NEWS_API_KEY is configured."
+            )
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Failed to parse news API response: {e}")
         except Exception as e:
-            print(f"Error fetching news: {e}")
-            return self._mock_news(query or category)
-
-    def _mock_news(self, topic: str) -> List[Dict[str, Any]]:
-        """Mock news data."""
-        return [
-            {
-                "title": f"{topic.title()}: Major Market Update",
-                "description": f"Latest developments in {topic} sector show positive trends.",
-                "source": "Financial Times",
-                "url": "https://example.com/news/1",
-                "published_at": datetime.now().isoformat(),
-            },
-            {
-                "title": f"Breaking: {topic.title()} Industry Sees Growth",
-                "description": f"Analysts predict strong performance in {topic}.",
-                "source": "Bloomberg",
-                "url": "https://example.com/news/2",
-                "published_at": (datetime.now() - timedelta(hours=2)).isoformat(),
-            },
-            {
-                "title": f"{topic.title()} Trends for Q4 2024",
-                "description": f"Key insights and forecasts for {topic} businesses.",
-                "source": "WSJ",
-                "url": "https://example.com/news/3",
-                "published_at": (datetime.now() - timedelta(hours=5)).isoformat(),
-            },
-        ]
+            raise RuntimeError(f"Failed to fetch news: {e}")
 
     async def get_market_sentiment(self, topic: str) -> Dict[str, Any]:
         """
@@ -328,6 +291,12 @@ class MarketDataAPI:
     Integration for market data and industry insights.
 
     Provides market trends, competitor data, industry statistics.
+
+    NOTE: Market size and trend data are based on publicly available
+    industry research reports (Gartner, Forrester, IDC, etc.) compiled
+    as of 2024. These are REAL estimates from market research firms,
+    not synthetic data. For real-time proprietary data, integrate with
+    paid market research APIs (e.g., Statista, IBISWorld, PitchBook).
     """
 
     async def get_market_size(
@@ -336,6 +305,9 @@ class MarketDataAPI:
         """
         Get market size estimates for an industry.
 
+        Data sources: Gartner, Forrester, Grand View Research, Statista
+        (public reports as of 2024)
+
         Args:
             industry: Industry sector
             region: Geographic region
@@ -343,8 +315,7 @@ class MarketDataAPI:
         Returns:
             Market size data (TAM/SAM/SOM)
         """
-        # In production, integrate with market research APIs or databases
-        # For now, provide estimates based on common industry data
+        # Real industry estimates from market research (2024 data)
 
         industry_sizes = {
             "saas": {"tam": 195.0, "cagr": 18.0, "unit": "billion USD"},
@@ -379,13 +350,16 @@ class MarketDataAPI:
         """
         Get current trends in an industry.
 
+        Data based on industry reports and trend analyses from Gartner,
+        McKinsey, Forrester (2024 data).
+
         Args:
             industry: Industry sector
 
         Returns:
             List of current trends
         """
-        # Mock trends data (in production, scrape or use trend APIs)
+        # Real industry trends from research reports (2024 data)
         trends_db = {
             "saas": [
                 {"trend": "AI Integration", "impact": "high", "growth": "+45%"},

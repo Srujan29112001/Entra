@@ -1,32 +1,44 @@
 """MCP server for data and external API tools."""
 
 from ..protocol import MCPServer, MCPTool, MCPToolParameter
-from app.tools.external_apis import ExternalAPIs
+from app.tools.external_apis import FinancialDataAPI, NewsAPI
+from app.tools.real_data_apis import UnifiedEconomicDataAPI
 
 
 async def get_stock_data_mcp(symbol: str, period: str = "1mo") -> dict:
-    """MCP wrapper for stock data."""
-    api = ExternalAPIs()
-    return await api.get_stock_quote(symbol, period=period)
+    """MCP wrapper for stock data using Alpha Vantage."""
+    api = FinancialDataAPI()
+    return await api.get_stock_quote(symbol)
 
 
 async def get_economic_data_mcp(indicator: str, country: str = "US") -> dict:
-    """MCP wrapper for economic indicators."""
-    api = ExternalAPIs()
-    return await api.get_economic_indicator(indicator, country=country)
+    """MCP wrapper for economic indicators using FRED/World Bank."""
+    api = UnifiedEconomicDataAPI()
+
+    if indicator.lower() in ["gdp", "real_gdp"]:
+        return await api.get_gdp(country)
+    elif indicator.lower() in ["inflation", "cpi"]:
+        return await api.get_inflation(country)
+    elif indicator.lower() in ["unemployment", "unrate"]:
+        return await api.get_unemployment(country)
+    elif indicator.lower() in ["interest_rate", "fed_funds"]:
+        return await api.get_interest_rate(country)
+    else:
+        raise ValueError(f"Unknown indicator: {indicator}")
 
 
 async def get_market_news_mcp(
     query: str, category: str = "business", limit: int = 10
 ) -> dict:
-    """MCP wrapper for market news."""
-    api = ExternalAPIs()
-    return await api.get_news(query, category=category, page_size=limit)
+    """MCP wrapper for market news using NewsAPI."""
+    api = NewsAPI()
+    articles = await api.get_business_news(query=query, category=category, page_size=limit)
+    return {"articles": articles, "total": len(articles)}
 
 
 async def get_forex_rate_mcp(from_currency: str, to_currency: str) -> dict:
-    """MCP wrapper for forex rates."""
-    api = ExternalAPIs()
+    """MCP wrapper for forex rates using Alpha Vantage."""
+    api = FinancialDataAPI()
     return await api.get_forex_rate(from_currency, to_currency)
 
 
